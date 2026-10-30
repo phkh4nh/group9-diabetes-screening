@@ -1,0 +1,134 @@
+{
+  "target": "Diabetes_binary",
+  "feature_order": [
+    "HighBP",
+    "HighChol",
+    "CholCheck",
+    "BMI",
+    "Smoker",
+    "Stroke",
+    "HeartDiseaseorAttack",
+    "PhysActivity",
+    "Fruits",
+    "Veggies",
+    "HvyAlcoholConsump",
+    "AnyHealthcare",
+    "NoDocbcCost",
+    "GenHlth",
+    "MentHlth",
+    "PhysHlth",
+    "DiffWalk",
+    "Sex",
+    "Age",
+    "Education",
+    "Income"
+  ],
+  "n_features": 21,
+  "features": {
+    "HighBP": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "HighChol": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "CholCheck": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "BMI": {
+      "type": "numeric",
+      "min": 12,
+      "max": 98
+    },
+    "Smoker": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "Stroke": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "HeartDiseaseorAttack": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "PhysActivity": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "Fruits": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "Veggies": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "HvyAlcoholConsump": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "AnyHealthcare": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "NoDocbcCost": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "GenHlth": {
+      "type": "ordinal",
+      "min": 1,
+      "max": 5
+    },
+    "MentHlth": {
+      "type": "numeric",
+      "min": 0,
+      "max": 30
+    },
+    "PhysHlth": {
+      "type": "numeric",
+      "min": 0,
+      "max": 30
+    },
+    "DiffWalk": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "Sex": {
+      "type": "binary",
+      "min": 0,
+      "max": 1
+    },
+    "Age": {
+      "type": "ordinal",
+      "min": 1,
+      "max": 13
+    },
+    "Education": {
+      "type": "ordinal",
+      "min": 1,
+      "max": 6
+    },
+    "Income": {
+      "type": "ordinal",
+      "min": 1,
+      "max": 8
+    }
+  }
+}

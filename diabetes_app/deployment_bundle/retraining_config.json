@@ -1,0 +1,23 @@
+{
+  "schedule_days": 30,
+  "minimum_requirements": [
+    "New records must contain all 21 required features",
+    "Actual diabetes outcome must be available",
+    "Input ranges must pass validation"
+  ],
+  "steps": [
+    "Load historical + newly labeled data",
+    "Validate schema and ranges",
+    "Create stratified train/validation split",
+    "Retrain XGBoost pipeline",
+    "Evaluate against current production model",
+    "Replace production model only if validation criteria are satisfied",
+    "Increment model version"
+  ],
+  "primary_metric": "PR-AUC",
+  "capacity_metrics": [
+    "Precision@K",
+    "Recall@K",
+    "Lift@K"
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "supported_capacities": [
+    0.005,
+    0.01,
+    0.025,
+    0.05,
+    0.1,
+    0.2
+  ],
+  "selection_method": "Rank predicted probabilities descending and select top K",
+  "locked_test_results": [
+    {
+      "capacity": 0.005,
+      "capacity_pct": "0.5%",
+      "global_precision_at_k": 0.689,
+      "global_recall_at_k": 0.0248,
+      "global_lift_at_k": 4.94
+    },
+    {
+      "capacity": 0.01,
+      "capacity_pct": "1%",
+      "global_precision_at_k": 0.6614,
+      "global_recall_at_k": 0.0475,
+      "global_lift_at_k": 4.75
+    },
+    {
+      "capacity": 0.025,
+      "capacity_pct": "2.5%",
+      "global_precision_at_k": 0.6052,
+      "global_recall_at_k": 0.1086,
+      "global_lift_at_k": 4.34
+    },
+    {
+      "capacity": 0.05,
+      "capacity_pct": "5%",
+      "global_precision_at_k": 0.5416,
+      "global_recall_at_k": 0.1944,
+      "global_lift_at_k": 3.89
+    },
+    {
+      "capacity": 0.1,
+      "capacity_pct": "10%",
+      "global_precision_at_k": 0.4773,
+      "global_recall_at_k": 0.3426,
+      "global_lift_at_k": 3.43
+    },
+    {
+      "capacity": 0.2,
+      "capacity_pct": "20%",
+      "global_precision_at_k": 0.3966,
+      "global_recall_at_k": 0.5694,
+      "global_lift_at_k": 2.85
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "evaluation_set": "locked_test_set",
+  "n_test": 50736,
+  "diabetes_prevalence": 0.13932907600126143,
+  "brier_score": 0.09868237609635581,
+  "naive_brier_score": 0.11991648458189615,
+  "brier_skill_score": 0.17707414088709916,
+  "n_calibration_bins": 10,
+  "calibration_strategy": "quantile",
+  "recalibrated": false
+}

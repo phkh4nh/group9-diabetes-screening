@@ -1,0 +1,8 @@
+# Python 3.13 preferred to match the team's model environment.
+streamlit>=1.41,<2
+xgboost==3.4.1
+scikit-learn==1.6.1
+pandas==2.2.3
+numpy==2.1.3
+shap==0.50.0
+requests>=2.31,<3
