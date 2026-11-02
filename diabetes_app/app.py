@@ -10,6 +10,11 @@ import hashlib
 import json
 import xgboost as xgb
 from pathlib import Path
+from io import BytesIO
+
+from batch_processing import (
+    MAX_UPLOAD_BYTES, validate_cohort, rank_and_select, create_excel_results,
+)
 
 import numpy as np
 import pandas as pd
@@ -220,278 +225,359 @@ except Exception as err:
 features = schema["feature_order"]
 capacities = sorted(float(x) for x in capacity_info["supported_capacities"])
 
-st.subheader("1 · Health questionnaire")
-st.caption(
-    "Fields start with the supplied `sample_input.csv` example. "
-    "Click Predict immediately to reproduce the team's sample result (1.03%)."
+screening_mode = st.radio(
+    "Choose a screening workflow",
+    ["Single patient", "Batch upload (Excel/CSV)"],
+    horizontal=True,
+    help="Use individual screening for one questionnaire; upload an Excel/CSV cohort for Top-K selection.",
 )
-inputs = {}
-with st.form("patient_form"):
-    with st.expander("A. General health & demographics", expanded=True):
-        left, right = st.columns(2)
-        with left:
-            inputs["Sex"] = st.selectbox(
-                "Sex (dataset coding)", [0, 1], index=int(sample["Sex"]),
-                format_func=lambda code: "Female" if code == 0 else "Male",
-                key="feature_Sex",
-            )
-            category_input("Age", "Age group", AGE, sample, inputs)
-            category_input("Education", "Education level", EDUCATION, sample, inputs)
-            category_input("Income", "Annual household income (original USD bands)", INCOME, sample, inputs)
-        with right:
-            category_input("GenHlth", "Self-reported general health", GENERAL_HEALTH, sample, inputs)
-            inputs["BMI"] = st.number_input(
-                "Body Mass Index (BMI)", min_value=12, max_value=98,
-                value=int(sample["BMI"]), step=1, key="feature_BMI",
-            )
-            inputs["MentHlth"] = st.number_input(
-                "Poor mental-health days (last 30)", min_value=0, max_value=30,
-                value=int(sample["MentHlth"]), step=1, key="feature_MentHlth",
-            )
-            inputs["PhysHlth"] = st.number_input(
-                "Poor physical-health days (last 30)", min_value=0, max_value=30,
-                value=int(sample["PhysHlth"]), step=1, key="feature_PhysHlth",
-            )
 
-    with st.expander("B. Health history & healthcare access", expanded=True):
-        left, right = st.columns(2)
-        with left:
-            for f in ("HighBP", "HighChol", "CholCheck", "Stroke"):
-                yes_no_input(f, sample, inputs)
-        with right:
-            for f in ("HeartDiseaseorAttack", "DiffWalk", "AnyHealthcare", "NoDocbcCost"):
-                yes_no_input(f, sample, inputs)
-
-    with st.expander("C. Lifestyle", expanded=True):
-        left, right = st.columns(2)
-        with left:
-            for f in ("Smoker", "PhysActivity", "Fruits"):
-                yes_no_input(f, sample, inputs)
-        with right:
-            for f in ("Veggies", "HvyAlcoholConsump"):
-                yes_no_input(f, sample, inputs)
-
-    with st.expander("Research setting (optional): clinic follow-up capacity"):
-        selected_capacity = st.selectbox(
-            "Patients the clinic can follow up (research simulation)", options=capacities,
-            index=capacities.index(0.10) if 0.10 in capacities else 0,
-            format_func=lambda cap: f"Highest-risk {cap * 100:g}% of patients",
-            help="For the group's capacity-based research only. "
-                 "Changing this does not change the patient's model probability.",
-        )
-        st.caption("Default: top 10%. This setting only affects the research selection example.")
-    submitted = st.form_submit_button("See my screening result", type="primary", use_container_width=True)
-
-if submitted:
-    try:
-        numeric_inputs = {name: int(inputs[name]) for name in features}
-        for name in features:
-            spec = schema["features"][name]
-            if not spec["min"] <= numeric_inputs[name] <= spec["max"]:
-                raise ValueError(f"{name} is outside the supported range.")
-        X = pd.DataFrame([numeric_inputs], columns=features)
-        probability = float(model.predict_proba(X)[0, 1])
-        percentile = estimate_percentile(probability, reference)
-        priority, _ = demo_priority(percentile)
-
-        shap_values = np.asarray(explainer.shap_values(X))[0]
-        if len(shap_values) != len(features):
-            raise ValueError("Unexpected SHAP output length.")
-        top_indices = np.argsort(-np.abs(shap_values))[:3]
-        top_shap = [(features[i], float(shap_values[i])) for i in top_indices]
-
-        prediction_id = None
-        logging_error = None
-        logging_success = False
-        if LOGGING_CONNECTED:
-            try:
-                logging_success, returned_id, logging_error = log_prediction(
-                    numeric_inputs, probability, percentile, top_shap, metadata["model_version"]
+if screening_mode == "Single patient":
+    st.subheader("1 · Health questionnaire")
+    st.caption(
+        "Fields start with the supplied `sample_input.csv` example. "
+        "Click Predict immediately to reproduce the team's sample result (1.03%)."
+    )
+    inputs = {}
+    with st.form("patient_form"):
+        with st.expander("A. General health & demographics", expanded=True):
+            left, right = st.columns(2)
+            with left:
+                inputs["Sex"] = st.selectbox(
+                    "Sex (dataset coding)", [0, 1], index=int(sample["Sex"]),
+                    format_func=lambda code: "Female" if code == 0 else "Male",
+                    key="feature_Sex",
                 )
-                if logging_success:
-                    prediction_id = returned_id
-                else:
-                    logging_error = logging_error or "Unknown Google Sheets error"
-            except Exception as err:
-                logging_error = str(err)
+                category_input("Age", "Age group", AGE, sample, inputs)
+                category_input("Education", "Education level", EDUCATION, sample, inputs)
+                category_input("Income", "Annual household income (original USD bands)", INCOME, sample, inputs)
+            with right:
+                category_input("GenHlth", "Self-reported general health", GENERAL_HEALTH, sample, inputs)
+                inputs["BMI"] = st.number_input(
+                    "Body Mass Index (BMI)", min_value=12, max_value=98,
+                    value=int(sample["BMI"]), step=1, key="feature_BMI",
+                )
+                inputs["MentHlth"] = st.number_input(
+                    "Poor mental-health days (last 30)", min_value=0, max_value=30,
+                    value=int(sample["MentHlth"]), step=1, key="feature_MentHlth",
+                )
+                inputs["PhysHlth"] = st.number_input(
+                    "Poor physical-health days (last 30)", min_value=0, max_value=30,
+                    value=int(sample["PhysHlth"]), step=1, key="feature_PhysHlth",
+                )
 
-        st.session_state["last_prediction"] = {
-            "probability": probability,
-            "percentile": percentile,
-            "priority": priority,
-            "capacity": selected_capacity,
-            "top_shap": top_shap,
-            "input_values": numeric_inputs,
-            "prediction_id": prediction_id,
-            "logging_error": logging_error,
-            "logging_success": logging_success,
-        }
-    except Exception as err:
-        st.error(f"Prediction failed: {err}")
+        with st.expander("B. Health history & healthcare access", expanded=True):
+            left, right = st.columns(2)
+            with left:
+                for f in ("HighBP", "HighChol", "CholCheck", "Stroke"):
+                    yes_no_input(f, sample, inputs)
+            with right:
+                for f in ("HeartDiseaseorAttack", "DiffWalk", "AnyHealthcare", "NoDocbcCost"):
+                    yes_no_input(f, sample, inputs)
 
-if "last_prediction" in st.session_state:
-    result = st.session_state["last_prediction"]
-    st.divider()
-    st.header("Your screening result")
-    st.caption("Based on the answers entered when you last clicked the prediction button.")
+        with st.expander("C. Lifestyle", expanded=True):
+            left, right = st.columns(2)
+            with left:
+                for f in ("Smoker", "PhysActivity", "Fruits"):
+                    yes_no_input(f, sample, inputs)
+            with right:
+                for f in ("Veggies", "HvyAlcoholConsump"):
+                    yes_no_input(f, sample, inputs)
 
-    # 1. The XGBoost predict_proba output is shown as a model SCORE in percent form.
-    # Locked-test calibration is imperfect; this is not a validated personal risk %.
-    st.subheader("1 · What does your result mean?")
-    st.metric("Model-estimated risk score", f"{result['probability']:.2%}")
-    st.write(
-        "This is the model's **score for the survey diabetes/prediabetes class**, "
-        "shown on a 0–100% scale. It is mainly useful for **comparing/ranking "
-        "screening priority across people**. It is **not** a clinically validated "
-        "percentage chance that you have diabetes or will develop it."
-    )
-    st.caption(
-        "The research team's locked-test calibration evaluation found imperfect "
-        "agreement between predicted scores and observed rates, particularly at "
-        "higher scores. See 'For researchers' for the calibration evidence."
-    )
-    if result["probability"] < float(reference["p50"]):
+        submitted = st.form_submit_button("See my screening result", type="primary", use_container_width=True)
+
+    if submitted:
+        try:
+            numeric_inputs = {name: int(inputs[name]) for name in features}
+            for name in features:
+                spec = schema["features"][name]
+                if not spec["min"] <= numeric_inputs[name] <= spec["max"]:
+                    raise ValueError(f"{name} is outside the supported range.")
+            X = pd.DataFrame([numeric_inputs], columns=features)
+            probability = float(model.predict_proba(X)[0, 1])
+            percentile = estimate_percentile(probability, reference)
+            priority, _ = demo_priority(percentile)
+
+            shap_values = np.asarray(explainer.shap_values(X))[0]
+            if len(shap_values) != len(features):
+                raise ValueError("Unexpected SHAP output length.")
+            top_indices = np.argsort(-np.abs(shap_values))[:3]
+            top_shap = [(features[i], float(shap_values[i])) for i in top_indices]
+
+            prediction_id = None
+            logging_error = None
+            logging_success = False
+            if LOGGING_CONNECTED:
+                try:
+                    logging_success, returned_id, logging_error = log_prediction(
+                        numeric_inputs, probability, percentile, top_shap, metadata["model_version"]
+                    )
+                    if logging_success:
+                        prediction_id = returned_id
+                    else:
+                        logging_error = logging_error or "Unknown Google Sheets error"
+                except Exception as err:
+                    logging_error = str(err)
+
+            st.session_state["last_prediction"] = {
+                "probability": probability,
+                "percentile": percentile,
+                "priority": priority,
+                "top_shap": top_shap,
+                "input_values": numeric_inputs,
+                "prediction_id": prediction_id,
+                "logging_error": logging_error,
+                "logging_success": logging_success,
+            }
+        except Exception as err:
+            st.error(f"Prediction failed: {err}")
+
+    if "last_prediction" in st.session_state:
+        result = st.session_state["last_prediction"]
+        st.divider()
+        st.header("Your screening result")
+        st.caption("Based on the answers entered when you last clicked the prediction button.")
+
+        # 1. The XGBoost predict_proba output is shown as a model SCORE in percent form.
+        # Locked-test calibration is imperfect; this is not a validated personal risk %.
+        st.subheader("1 · What does your result mean?")
+        st.metric("Model-estimated risk score", f"{result['probability']:.2%}")
+        st.write(
+            "This is the model's **score for the survey diabetes/prediabetes class**, "
+            "shown on a 0–100% scale. It is mainly useful for **comparing/ranking "
+            "screening priority across people**. It is **not** a clinically validated "
+            "percentage chance that you have diabetes or will develop it."
+        )
         st.caption(
-            "For context: this model score is below the median score in the supplied "
-            "reference distribution. A lower score does not rule out diabetes."
+            "The research team's locked-test calibration evaluation found imperfect "
+            "agreement between predicted scores and observed rates, particularly at "
+            "higher scores. See 'For researchers' for the calibration evidence."
         )
-    else:
+        if result["probability"] < float(reference["p50"]):
+            st.caption(
+                "For context: this model score is below the median score in the supplied "
+                "reference distribution. A lower score does not rule out diabetes."
+            )
+        else:
+            st.caption(
+                "For context: this model score is at or above the median score in the "
+                "supplied reference distribution. This alone cannot confirm diabetes."
+            )
+
+        # 2. Translate the exact same SHAP top 3 into readable survey features.
+        st.subheader("2 · Why did the model give this result?")
+        st.write(
+            "These are the **three answers that influenced this prediction most** "
+            "according to SHAP. A factor can push the model score up or down "
+            "relative to its baseline."
+        )
+        top = result["top_shap"]
+        for feature, shap_value in top:
+            name = FEATURE_TITLES.get(feature, feature)
+            response = display_answer(feature, result["input_values"][feature])
+            direction = "Increased the model score ↑" if shap_value > 0 else (
+                "Decreased the model score ↓" if shap_value < 0 else "No estimated change"
+            )
+            st.markdown(f"**{name}** — {response}  \n{direction}")
+
+        shap_table = pd.DataFrame(
+            {"Factor": [FEATURE_TITLES.get(f, f) for f, _ in top],
+             "Contribution": [v for _, v in top]}
+        ).set_index("Factor")
+        st.bar_chart(shap_table, horizontal=True)
         st.caption(
-            "For context: this model score is at or above the median score in the "
-            "supplied reference distribution. This alone cannot confirm diabetes."
+            "SHAP explains the model's calculation, not what caused a person's health condition. "
+            "The bar values use a statistical log-odds scale — they are **not percentages**."
         )
 
-    # 2. Translate the exact same SHAP top 3 into readable survey features.
-    st.subheader("2 · Why did the model give this result?")
+        # 3. Non-diagnostic general next steps, without declaring a medical urgency tier.
+        st.subheader("3 · What can you do next?")
+        st.markdown(
+            """- **Use this as a screening discussion starter**, not proof that you do or do not have diabetes.
+    - **Ask a healthcare professional whether you need blood sugar testing** (such as HbA1c or fasting plasma glucose), especially if you have symptoms or known risk factors. Even a lower model score does not replace recommended screening.
+    - **Focus on sustainable habits** such as regular physical activity, balanced eating, and avoiding smoking. These are general health suggestions, not a treatment plan based on this score."""
+        )
+        st.warning(
+            "Class project only. Do not use this app to make diagnosis or treatment decisions "
+            "or upload identifiable patient records."
+        )
+
+        # Leave research metrics available for the group report and the assessor.
+        with st.expander("For researchers: calibration, SHAP and capacity metrics"):
+            st.markdown("**Full research-oriented result**")
+            c1, c2 = st.columns(2)
+            c1.metric("Estimated model-score percentile", f"≈ {result['percentile']:.1f} / 100")
+            c2.metric("Demo priority group", result["priority"])
+            st.caption(
+                "Percentile is estimated by interpolation from sparse reference quantiles "
+                "(especially rough below the median). Priority labels are demo conventions, "
+                "not validated medical risk categories."
+            )
+            st.caption(
+                "No K% is needed for an individual prediction. Accurate capacity-based "
+                "selection is available in Batch upload, where all records are ranked together."
+            )
+            st.dataframe(
+                pd.DataFrame(
+                    [{"Feature": f, "SHAP value (log-odds)": round(v, 4)} for f, v in top]
+                ), hide_index=True, use_container_width=True,
+            )
+
+            # All six capacity scenarios are provided by Hưng's capacity_config.json.
+            # The file gives top-K operating SHARES, not exact patient score cutoffs.
+            st.markdown("**Six research capacity scenarios (locked-test group metrics)**")
+            capacity_table = pd.DataFrame(capacity_info["locked_test_results"])
+            st.dataframe(
+                pd.DataFrame({
+                    "Top K": capacity_table["capacity_pct"],
+                    "Precision@K": capacity_table["global_precision_at_k"].map(lambda x: f"{x:.2%}"),
+                    "Recall@K": capacity_table["global_recall_at_k"].map(lambda x: f"{x:.2%}"),
+                    "Lift@K": capacity_table["global_lift_at_k"].map(lambda x: f"{x:.2f}×"),
+                }),
+                hide_index=True, use_container_width=True,
+            )
+            st.caption(
+                "These figures come from Hưng's locked test set, NOT the current patient "
+                "or an uploaded file. K% is applied to an actual ranked patient list in Batch upload."
+            )
+
+            st.divider()
+            st.markdown("**Calibration on the locked test set**")
+            a, b, c = st.columns(3)
+            a.metric("Model Brier score", f"{calibration_report['brier_score']:.4f}")
+            b.metric("Naive baseline Brier", f"{calibration_report['naive_brier_score']:.4f}")
+            c.metric("Locked-test observations", f"{calibration_report['n_test']:,}")
+            st.caption(
+                "Lower Brier scores are better. The model has a lower Brier score "
+                "than the naive baseline, but this does NOT mean its probabilities "
+                "are perfectly calibrated."
+            )
+            st.image(
+                str(BUNDLE / "calibration_curve.png"),
+                caption="Team-supplied calibration data: 10 quantile bins, global XGBoost vs ideal calibration (45° line).",
+                use_container_width=True,
+            )
+            st.write(
+                "Across these locked-test bins, predicted scores are **higher** than "
+                "the observed positive-class rates; the gap is larger in the "
+                "highest-score bins. The chart describes **groups**, not an individual's "
+                "true disease probability."
+            )
+            st.caption(
+                f"Source: calibration_report.json + calibration_table.csv · "
+                f"{calibration_report['n_calibration_bins']} quantile bins · "
+                f"Brier skill score {calibration_report['brier_skill_score']:.3f} · "
+                "Model was evaluated, NOT recalibrated."
+            )
+
+        if result["logging_error"]:
+            st.error(f"Prediction succeeded, but the result was NOT saved to Google Sheets: {result['logging_error']}")
+        elif result["prediction_id"] is not None:
+            st.success(f"Logged successfully · prediction_id: {result['prediction_id']}")
+        elif not LOGGING_CONNECTED:
+            st.caption("Demo logging not connected yet (Việt Anh's logger.py); no prediction was saved.")
+
+else:
+    st.subheader("Batch screening · Excel/CSV cohort upload")
     st.write(
-        "These are the **three answers that influenced this prediction most** "
-        "according to SHAP. A factor can push the model score up or down "
-        "relative to its baseline."
-    )
-    top = result["top_shap"]
-    for feature, shap_value in top:
-        name = FEATURE_TITLES.get(feature, feature)
-        response = display_answer(feature, result["input_values"][feature])
-        direction = "Increased the model score ↑" if shap_value > 0 else (
-            "Decreased the model score ↓" if shap_value < 0 else "No estimated change"
-        )
-        st.markdown(f"**{name}** — {response}  \n{direction}")
-
-    shap_table = pd.DataFrame(
-        {"Factor": [FEATURE_TITLES.get(f, f) for f, _ in top],
-         "Contribution": [v for _, v in top]}
-    ).set_index("Factor")
-    st.bar_chart(shap_table, horizontal=True)
-    st.caption(
-        "SHAP explains the model's calculation, not what caused a person's health condition. "
-        "The bar values use a statistical log-odds scale — they are **not percentages**."
-    )
-
-    # 3. Non-diagnostic general next steps, without declaring a medical urgency tier.
-    st.subheader("3 · What can you do next?")
-    st.markdown(
-        """- **Use this as a screening discussion starter**, not proof that you do or do not have diabetes.
-- **Ask a healthcare professional whether you need blood sugar testing** (such as HbA1c or fasting plasma glucose), especially if you have symptoms or known risk factors. Even a lower model score does not replace recommended screening.
-- **Focus on sustainable habits** such as regular physical activity, balanced eating, and avoiding smoking. These are general health suggestions, not a treatment plan based on this score."""
+        "Upload an **anonymous** list of patients. The app scores every valid row, "
+        "ranks the cohort from highest to lowest model score, and selects the **top K%** "
+        "that fits the simulated follow-up capacity."
     )
     st.warning(
-        "Class project only. Do not use this app to make diagnosis or treatment decisions "
-        "or upload identifiable patient records."
+        "Classroom demonstration only: do not upload real patient names, IDs, contact "
+        "details or confidential medical records. Use anonymous/synthetic survey data."
     )
+    st.download_button(
+        "Download example Excel (20 synthetic records)",
+        data=(BUNDLE / "batch_example_20.xlsx").read_bytes(),
+        file_name="group9_batch_example_20.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    with st.form("batch_screening_form"):
+        upload = st.file_uploader(
+            "Upload Excel (.xlsx) or CSV with 21 BRFSS features", type=["xlsx", "csv"],
+            help="Use the example CSV header names. Extra columns are ignored. The first Excel sheet is read.",
+        )
+        batch_capacity = st.selectbox(
+            "Follow-up capacity · select top K%", options=capacities,
+            index=capacities.index(0.10) if 0.10 in capacities else 0,
+            format_func=lambda k: f"Top {k * 100:g}% of uploaded patients",
+        )
+        run_batch = st.form_submit_button("Screen and rank patients", type="primary", use_container_width=True)
 
-    # Leave research metrics available for the group report and the assessor.
-    with st.expander("For researchers: calibration, SHAP and capacity metrics"):
-        st.markdown("**Full research-oriented result**")
-        c1, c2 = st.columns(2)
-        c1.metric("Estimated model-score percentile", f"≈ {result['percentile']:.1f} / 100")
-        c2.metric("Demo priority group", result["priority"])
-        st.caption(
-            "Percentile is estimated by interpolation from sparse reference quantiles "
-            "(especially rough below the median). Priority labels are demo conventions, "
-            "not validated medical risk categories."
-        )
-        selected = result["percentile"] >= 100 * (1 - result["capacity"])
-        capacity_row = next(
-            (row for row in capacity_info["locked_test_results"]
-             if abs(float(row["capacity"]) - result["capacity"]) < 1e-9), None,
-        )
-        capacity_label = f"top {result['capacity'] * 100:g}%"
-        if selected:
-            st.write(f"Estimated capacity eligibility: **inside** the {capacity_label} group.")
+    if run_batch:
+        st.session_state.pop("batch_screening_result", None)
+        if upload is None:
+            st.error("Please upload an Excel or CSV file first.")
         else:
-            st.write(f"Estimated capacity eligibility: **outside** the {capacity_label} group.")
-        if capacity_row is not None:
-            st.write(
-                f"Locked-test **group-level** performance at {capacity_label}: "
-                f"Precision@K = {capacity_row['global_precision_at_k']:.2%}; "
-                f"Recall@K = {capacity_row['global_recall_at_k']:.2%}. "
-                "These values are not the person's probability."
-            )
-        st.caption(
-            "True top-K selection requires scoring and ranking the whole patient cohort; "
-            "this single-person view uses an approximate percentile."
-        )
-        st.dataframe(
-            pd.DataFrame(
-                [{"Feature": f, "SHAP value (log-odds)": round(v, 4)} for f, v in top]
-            ), hide_index=True, use_container_width=True,
-        )
+            try:
+                file_bytes = upload.getvalue()
+                if len(file_bytes) > MAX_UPLOAD_BYTES:
+                    raise ValueError("File exceeds the 10 MB limit for this classroom demo.")
+                if upload.name.lower().endswith(".xlsx"):
+                    raw = pd.read_excel(BytesIO(file_bytes), engine="openpyxl", sheet_name=0)
+                else:
+                    raw = pd.read_csv(BytesIO(file_bytes), encoding="utf-8-sig")
+                ignored = [c for c in raw.columns if c not in features]
+                clean = validate_cohort(raw, schema)
+                ranked = rank_and_select(clean, model, features, batch_capacity)
+                st.session_state["batch_screening_result"] = {
+                    "ranked": ranked,
+                    "capacity": batch_capacity,
+                    "ignored": ignored,
+                }
+            except Exception as err:
+                st.error(f"Batch screening failed: {err}")
 
-        # All six capacity scenarios are provided by Hưng's capacity_config.json.
-        # The file gives top-K operating SHARES, not exact patient score cutoffs.
-        st.markdown("**Six research capacity scenarios (locked-test group metrics)**")
-        capacity_table = pd.DataFrame(capacity_info["locked_test_results"])
+    if "batch_screening_result" in st.session_state:
+        batch = st.session_state["batch_screening_result"]
+        ranked = batch["ranked"]
+        k = batch["capacity"]
+        selected = ranked[ranked["Selected for follow-up"] == "Yes"]
+        st.divider()
+        st.subheader("Cohort screening results")
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Records screened", f"{len(ranked):,}")
+        m2.metric("Follow-up capacity", f"Top {k * 100:g}%")
+        m3.metric("Selected for follow-up", f"{len(selected):,}")
+        st.caption(
+            f"Selected {len(selected)} of {len(ranked)} records using ceil(N × K%). "
+            "For equal scores, the earlier spreadsheet row is ranked first. "
+            "Model scores are not clinically validated probabilities."
+        )
+        if batch["ignored"]:
+            st.info(
+                "Extra columns were ignored for privacy and prediction: "
+                + ", ".join(map(str, batch["ignored"][:8]))
+                + (" …" if len(batch["ignored"]) > 8 else "")
+            )
         st.dataframe(
-            pd.DataFrame({
-                "Top K": capacity_table["capacity_pct"],
-                "Precision@K": capacity_table["global_precision_at_k"].map(lambda x: f"{x:.2%}"),
-                "Recall@K": capacity_table["global_recall_at_k"].map(lambda x: f"{x:.2%}"),
-                "Lift@K": capacity_table["global_lift_at_k"].map(lambda x: f"{x:.2f}×"),
-            }),
+            ranked[["Source row", "Rank", "Model score (%)", "Selected for follow-up"]],
             hide_index=True, use_container_width=True,
         )
-        st.caption(
-            "The six top-K percentages are clinic capacity scenarios, NOT six supplied "
-            "score thresholds or medical cutoffs. The reference file contains only "
-            "p50, p75, p90, p95, p99 and max; other percentiles (including p80, "
-            "p97.5 and p99.5) are interpolated and approximate."
+        st.download_button(
+            "Download ranked Excel results (.xlsx)",
+            data=create_excel_results(ranked, k, metadata["model_version"]),
+            file_name="group9_top_k_screening_results.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            type="primary",
         )
-
-        st.divider()
-        st.markdown("**Calibration on the locked test set**")
-        a, b, c = st.columns(3)
-        a.metric("Model Brier score", f"{calibration_report['brier_score']:.4f}")
-        b.metric("Naive baseline Brier", f"{calibration_report['naive_brier_score']:.4f}")
-        c.metric("Locked-test observations", f"{calibration_report['n_test']:,}")
-        st.caption(
-            "Lower Brier scores are better. The model has a lower Brier score "
-            "than the naive baseline, but this does NOT mean its probabilities "
-            "are perfectly calibrated."
+        capacity_row = next(
+            (item for item in capacity_info["locked_test_results"]
+             if abs(float(item["capacity"]) - k) < 1e-9), None
         )
-        st.image(
-            str(BUNDLE / "calibration_curve.png"),
-            caption="Team-supplied calibration data: 10 quantile bins, global XGBoost vs ideal calibration (45° line).",
-            use_container_width=True,
+        if capacity_row is not None:
+            st.caption(
+                f"For context only: on the separate locked test set at Top {k * 100:g}%, "
+                f"Precision@K = {capacity_row['global_precision_at_k']:.2%}, "
+                f"Recall@K = {capacity_row['global_recall_at_k']:.2%}. "
+                "These are historical group metrics, not measured performance on this upload."
+            )
+        st.info(
+            "Batch results are available for download; this workflow does not automatically "
+            "send uploaded cohorts to Google Sheets or retrain the model."
         )
-        st.write(
-            "Across these locked-test bins, predicted scores are **higher** than "
-            "the observed positive-class rates; the gap is larger in the "
-            "highest-score bins. The chart describes **groups**, not an individual's "
-            "true disease probability."
-        )
-        st.caption(
-            f"Source: calibration_report.json + calibration_table.csv · "
-            f"{calibration_report['n_calibration_bins']} quantile bins · "
-            f"Brier skill score {calibration_report['brier_skill_score']:.3f} · "
-            "Model was evaluated, NOT recalibrated."
-        )
-
-    if result["logging_error"]:
-        st.error(f"Prediction succeeded, but the result was NOT saved to Google Sheets: {result['logging_error']}")
-    elif result["prediction_id"] is not None:
-        st.success(f"Logged successfully · prediction_id: {result['prediction_id']}")
-    elif not LOGGING_CONNECTED:
-        st.caption("Demo logging not connected yet (Việt Anh's logger.py); no prediction was saved.")
 
 with st.expander("Research notes & model information"):
     st.markdown(
@@ -500,9 +586,9 @@ with st.expander("Research notes & model information"):
           the positive class combines survey diabetes/prediabetes status.
         - **Priority tiers (demo only):** Very high = estimated top 2.5%;
           High = top 10%; Moderate = top 20%; Standard = outside top 20%.
-        - **Capacity selection:** uses the estimated score percentile, not a
-          patient-list ranking. A true top-K selection requires scoring and
-          ranking all patients in that cohort.
+        - **Capacity selection:** the single-person form does not require K%.
+          For cohort-level simulation, Batch upload uses the actual uploaded
+          records, ranks their scores and selects the highest-scoring K%.
         - **Privacy:** do not enter real, identifiable patient records in this
           classroom prototype or a publicly hosted demonstration.
         - **Calibration:** the locked-test Brier evaluation and calibration curve
