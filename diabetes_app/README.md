@@ -107,6 +107,17 @@ If `logger.py` isn't present, **no predictions are logged**. If it is present an
 - **SHAP:** calculated in log-odds with supplied background data; explanations describe model behavior, **not causality**.
 - **Calibration:** Hưng evaluated the model on the 50,736-observation locked test set (Brier 0.0987 vs naive baseline 0.1199, 10 quantile bins). The model tends to overestimate observed rates, especially in high-score bins; **it was evaluated, not recalibrated**. Risk score is not a clinically verified personal probability.
 
+## 7. Retraining pipeline (offline, added 03 Nov)
+
+`retrain_pipeline.py` retrains the global XGBoost model outside the app, following `deployment_bundle/retraining_config.json`. The app itself still never retrains. Step-by-step guide (Vietnamese): **`RETRAINING_VI.md`**.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-retrain.txt
+.\.venv\Scripts\python.exe retrain_pipeline.py --new-data data\sheet_export.csv
+```
+
+On the original data the pipeline reproduces v1.0.0 exactly (identical scores, same Brier, OOF PR-AUC and capacity metrics). A new version replaces `deployment_bundle/` only when every promotion criterion passes **and** `--promote` is given; the old bundle is archived in `model_registry/archive/`.
+
 ## Troubleshooting
 
 - `python was not found`: install Python 3.13 and enable adding it to PATH, or try `py -3.13`.

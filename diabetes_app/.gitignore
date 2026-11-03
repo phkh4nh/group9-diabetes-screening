@@ -1,0 +1,11 @@
+# Environment & secrets (LOGGING_SETUP_VI.md assumes these are excluded)
+.venv/
+__pycache__/
+.streamlit/secrets.toml
+
+# Retraining: raw data, run reports and unpromoted candidates stay local
+data/
+retraining_runs/
+model_registry/candidates/
+deployment_bundle.__staging__/
+deployment_bundle.__old__/
