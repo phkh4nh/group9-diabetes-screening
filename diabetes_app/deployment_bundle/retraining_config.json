@@ -19,5 +19,32 @@
     "Precision@K",
     "Recall@K",
     "Lift@K"
-  ]
+  ],
+  "data_requirements": {
+    "_status": "PROPOSED defaults by the retraining pipeline — confirm thresholds with Hưng before quoting them in the report",
+    "min_new_labeled_rows": 500,
+    "min_new_positive_outcomes": 50,
+    "min_new_negative_outcomes": 50
+  },
+  "split": {
+    "historical_locked_test": "Re-created exactly from training_params.json (never used for training)",
+    "new_data_holdout_fraction": 0.2,
+    "new_data_holdout_assignment": "Stable SHA-256 hash of prediction_id (Sheet rows) or of the 21 answers + label (dataset rows): a record in the holdout stays there in every future run and is never trained on",
+    "min_holdout_positives": 30
+  },
+  "calibration": {
+    "n_bins": 10,
+    "strategy": "quantile",
+    "recalibrate": false
+  },
+  "promotion_criteria": {
+    "_status": "PROPOSED defaults — confirm with Hưng",
+    "primary_evaluation_set": "new-data holdout when it has enough outcomes, otherwise the locked test",
+    "min_primary_improvement": 0.0,
+    "max_locked_test_pr_auc_drop": 0.005,
+    "max_brier_increase": 0.002,
+    "max_precision_at_k_drop": 0.02,
+    "bootstrap_resamples": 200,
+    "requires_manual_approval": true
+  }
 }
