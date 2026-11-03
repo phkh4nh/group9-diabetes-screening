@@ -1,0 +1,47 @@
+{
+  "_note": "Hyperparameters extracted once from diabetes_global_xgboost.pkl (v1.0.0, Optuna-tuned) so retraining never needs to unpickle. Verified 03 Nov 2026: fitting XGBClassifier(**xgb_params) on the historical train split reproduces the production .ubj exactly (max |Δscore| = 0) and the 5-fold OOF PR-AUC 0.4384 / ROC-AUC 0.8316 in model_metadata.json.",
+  "model_class": "xgboost.XGBClassifier",
+  "xgb_params": {
+    "objective": "binary:logistic",
+    "colsample_bytree": 0.9426306126709448,
+    "enable_categorical": true,
+    "eval_metric": "logloss",
+    "gamma": 1.0903270818923352,
+    "learning_rate": 0.01809302702911502,
+    "max_depth": 4,
+    "min_child_weight": 1,
+    "n_estimators": 1500,
+    "n_jobs": -1,
+    "random_state": 42,
+    "reg_alpha": 3.0875424497666866,
+    "reg_lambda": 12.918109496946824,
+    "scale_pos_weight": 1.323491273620245,
+    "subsample": 0.7522320999564196,
+    "tree_method": "hist"
+  },
+  "historical_dataset": {
+    "file": "diabetes_binary_health_indicators_BRFSS2015.csv",
+    "rows": 253680,
+    "sha256": "19f367e3e3350768f0c144c5d73ee5b355f67a57eaaa86ca7bd8aec594d8b1d0",
+    "sha256_note": "Reference copy used for verification. A different checksum (e.g. CRLF line endings) only triggers a warning; the locked-test check is decisive."
+  },
+  "historical_split": {
+    "method": "sklearn.model_selection.train_test_split",
+    "test_size": 0.2,
+    "stratify": "Diabetes_binary",
+    "random_state": 42
+  },
+  "cross_validation": {
+    "method": "sklearn.model_selection.StratifiedKFold",
+    "n_splits": 5,
+    "shuffle": true,
+    "random_state": 42
+  },
+  "derived_artifacts": {
+    "risk_reference": "np.quantile of predicted scores on the model's own training rows (p50, p75, p90, p95, p99) + max",
+    "capacity_config": "locked test, K = ceil(n_test x capacity), rows ranked by score descending",
+    "calibration": "sklearn.calibration.calibration_curve on the locked test, 10 quantile bins, no recalibration",
+    "shap_background": "X_train.sample(500, random_state=42) from the historical train split; reused unchanged"
+  },
+  "trained_model_version": "1.0.0"
+}
