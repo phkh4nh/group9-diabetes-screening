@@ -223,7 +223,6 @@ except Exception as err:
     st.stop()
 
 features = schema["feature_order"]
-capacities = sorted(float(x) for x in capacity_info["supported_capacities"])
 
 screening_mode = st.radio(
     "Choose a screening workflow",
@@ -481,8 +480,8 @@ else:
     st.subheader("Batch screening · Excel/CSV cohort upload")
     st.write(
         "Upload an **anonymous** list of patients. The app scores every valid row, "
-        "ranks the cohort from highest to lowest model score, and selects the **top K%** "
-        "that fits the simulated follow-up capacity."
+        "ranks the cohort from highest to lowest model score, and selects as many "
+        "patients as the hospital can handle. The app calculates the effective top-K% automatically."
     )
     st.warning(
         "Classroom demonstration only: do not upload real patient names, IDs, contact "
@@ -499,10 +498,12 @@ else:
             "Upload Excel (.xlsx) or CSV with 21 BRFSS features", type=["xlsx", "csv"],
             help="Use the example CSV header names. Extra columns are ignored. The first Excel sheet is read.",
         )
-        batch_capacity = st.selectbox(
-            "Follow-up capacity · select top K%", options=capacities,
-            index=capacities.index(0.10) if 0.10 in capacities else 0,
-            format_func=lambda k: f"Top {k * 100:g}% of uploaded patients",
+        hospital_capacity = st.number_input(
+            "Hospital follow-up capacity (number of patients)",
+            min_value=0, value=2, step=1,
+            help="Enter how many patients the hospital can follow up. "
+                 "The app calculates K% from the valid uploaded rows and picks exactly "
+                 "that many top-ranked records (or everyone if capacity exceeds the cohort).",
         )
         run_batch = st.form_submit_button("Screen and rank patients", type="primary", use_container_width=True)
 
@@ -521,10 +522,10 @@ else:
                     raw = pd.read_csv(BytesIO(file_bytes), encoding="utf-8-sig")
                 ignored = [c for c in raw.columns if c not in features]
                 clean = validate_cohort(raw, schema)
-                ranked = rank_and_select(clean, model, features, batch_capacity)
+                ranked = rank_and_select(clean, model, features, int(hospital_capacity))
                 st.session_state["batch_screening_result"] = {
                     "ranked": ranked,
-                    "capacity": batch_capacity,
+                    "hospital_capacity": int(hospital_capacity),
                     "ignored": ignored,
                 }
             except Exception as err:
@@ -533,19 +534,28 @@ else:
     if "batch_screening_result" in st.session_state:
         batch = st.session_state["batch_screening_result"]
         ranked = batch["ranked"]
-        k = batch["capacity"]
+        hospital_capacity = batch["hospital_capacity"]
         selected = ranked[ranked["Selected for follow-up"] == "Yes"]
+        k = len(selected) / len(ranked)
         st.divider()
         st.subheader("Cohort screening results")
-        m1, m2, m3 = st.columns(3)
+        m1, m2, m3, m4 = st.columns(4)
         m1.metric("Records screened", f"{len(ranked):,}")
-        m2.metric("Follow-up capacity", f"Top {k * 100:g}%")
-        m3.metric("Selected for follow-up", f"{len(selected):,}")
+        m2.metric("Hospital capacity", f"{hospital_capacity:,} patients")
+        m3.metric("Calculated Top-K", f"{k:.2%}")
+        m4.metric("Selected for follow-up", f"{len(selected):,}")
         st.caption(
-            f"Selected {len(selected)} of {len(ranked)} records using ceil(N × K%). "
-            "For equal scores, the earlier spreadsheet row is ranked first. "
-            "Model scores are not clinically validated probabilities."
+            f"Selected the {len(selected)} highest-ranked records from {len(ranked)} "
+            "valid patients. For equal model scores, the earlier spreadsheet row "
+            "comes first. Model scores are not clinically validated probabilities."
         )
+        if hospital_capacity > len(ranked):
+            st.info(
+                f"Capacity ({hospital_capacity:,}) exceeds the uploaded cohort "
+                f"({len(ranked):,}), so all patients are selected (effective Top-100%)."
+            )
+        elif hospital_capacity == 0:
+            st.info("Hospital capacity is 0, so the app ranks every record but selects no one for follow-up.")
         if batch["ignored"]:
             st.info(
                 "Extra columns were ignored for privacy and prediction: "
@@ -558,7 +568,7 @@ else:
         )
         st.download_button(
             "Download ranked Excel results (.xlsx)",
-            data=create_excel_results(ranked, k, metadata["model_version"]),
+            data=create_excel_results(ranked, hospital_capacity, metadata["model_version"]),
             file_name="group9_top_k_screening_results.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             type="primary",
@@ -574,6 +584,12 @@ else:
                 f"Recall@K = {capacity_row['global_recall_at_k']:.2%}. "
                 "These are historical group metrics, not measured performance on this upload."
             )
+        else:
+            st.caption(
+                "Historical locked-test metrics are available only for the six evaluated "
+                "K% scenarios; none exactly matches this cohort's calculated capacity. "
+                "The app still ranks and selects the correct number of patients."
+            )
         st.info(
             "Batch results are available for download; this workflow does not automatically "
             "send uploaded cohorts to Google Sheets or retrain the model."
@@ -587,8 +603,11 @@ with st.expander("Research notes & model information"):
         - **Priority tiers (demo only):** Very high = estimated top 2.5%;
           High = top 10%; Moderate = top 20%; Standard = outside top 20%.
         - **Capacity selection:** the single-person form does not require K%.
-          For cohort-level simulation, Batch upload uses the actual uploaded
-          records, ranks their scores and selects the highest-scoring K%.
+          For Batch upload, the hospital enters an absolute follow-up capacity
+          (number of patients). The app computes its effective percentage from
+          the validated cohort and selects exactly that many top-ranked records,
+          capped by the number of uploaded patients. All capacities use the SAME
+          global XGBoost model; they are not different trained models.
         - **Privacy:** do not enter real, identifiable patient records in this
           classroom prototype or a publicly hosted demonstration.
         - **Calibration:** the locked-test Brier evaluation and calibration curve

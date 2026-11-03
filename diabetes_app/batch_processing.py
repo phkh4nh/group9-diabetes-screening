@@ -6,7 +6,6 @@ Only anonymous numeric BRFSS features are accepted.
 from __future__ import annotations
 
 from io import BytesIO
-from math import ceil
 
 import numpy as np
 import pandas as pd
@@ -61,10 +60,18 @@ def validate_cohort(raw: pd.DataFrame, schema: dict) -> pd.DataFrame:
     return clean.reset_index(drop=True)
 
 
-def rank_and_select(clean: pd.DataFrame, model, features: list[str], capacity: float) -> pd.DataFrame:
-    """Rank uploaded cohort by model score and select ceil(K * N) deterministically."""
-    if not 0 < capacity <= 1:
-        raise ValueError("Capacity must be between 0 and 100%.")
+def rank_and_select(clean: pd.DataFrame, model, features: list[str], capacity_count: int) -> pd.DataFrame:
+    """Rank the cohort and select exactly min(hospital capacity, cohort size) rows.
+
+    Hospital capacity is an absolute number of patients, not a percentage.
+    Zero capacity is supported and selects no patients while keeping all scores.
+    """
+    if isinstance(capacity_count, (bool, np.bool_)) or not isinstance(capacity_count, (int, np.integer)):
+        raise ValueError("Hospital capacity must be a whole number of patients.")
+    if capacity_count < 0:
+        raise ValueError("Hospital capacity cannot be negative.")
+    if clean.empty:
+        raise ValueError("The cohort must contain at least one valid patient.")
     feature_frame = clean[features]
     probs = np.asarray(model.predict_proba(feature_frame), dtype=float)
     if probs.shape != (len(clean), 2):
@@ -72,7 +79,7 @@ def rank_and_select(clean: pd.DataFrame, model, features: list[str], capacity: f
     scores = probs[:, 1]
     if not np.isfinite(scores).all() or (scores < 0).any() or (scores > 1).any():
         raise ValueError("The model returned invalid scores.")
-    n_selected = min(len(clean), max(1, ceil(capacity * len(clean))))
+    n_selected = min(len(clean), int(capacity_count))
 
     result = clean.copy()
     result["_raw_model_score"] = scores
@@ -86,19 +93,24 @@ def rank_and_select(clean: pd.DataFrame, model, features: list[str], capacity: f
     return result
 
 
-def create_excel_results(result: pd.DataFrame, capacity: float, model_version: str) -> bytes:
-    """Export every anonymized input, ranking, and selected subset in an Excel workbook."""
+def create_excel_results(result: pd.DataFrame, capacity_count: int, model_version: str) -> bytes:
+    """Export scores, selections and the absolute hospital capacity to Excel."""
     selected = result[result["Selected for follow-up"] == "Yes"]
+    effective_count = len(selected)
+    effective_share = effective_count / len(result) if len(result) else 0.0
     notes = pd.DataFrame([
         ("Purpose", "Classroom cohort-level capacity simulation; not clinical triage"),
-        ("Selection rule", f"Highest-ranked ceil(N x {capacity:g}) scores from this uploaded cohort"),
-        ("Requested capacity", f"{capacity:.1%}"),
+        ("Selection rule", "Highest-ranked min(requested hospital capacity, uploaded patients) records"),
+        ("Requested hospital capacity (patients)", int(capacity_count)),
         ("Uploaded records", len(result)),
+        ("Effective follow-up capacity (patients)", effective_count),
+        ("Calculated top-K share", f"{effective_share:.4%}"),
         ("Selected records", len(selected)),
         ("Model version", str(model_version)),
         ("Score meaning", "Uncalibrated model-estimated class score; NOT a validated diabetes probability"),
         ("Tie rule", "Same score: earlier source row first"),
         ("Actual outcomes", "Not collected by this batch screening demonstration"),
+        ("Model selection", "Same global XGBoost model for all hospital capacity values"),
     ], columns=["Item", "Details"])
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
