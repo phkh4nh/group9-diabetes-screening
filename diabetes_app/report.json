@@ -1,0 +1,359 @@
+{
+  "run_id": "20261111T081944Z_b041e9",
+  "started_at": "2026-11-11T08:19:44.406084Z",
+  "status": "CANDIDATE_READY (run again with --promote to deploy)",
+  "production_version": "1.0.0",
+  "arguments": {
+    "historical": "/content/repo/diabetes_app/data/diabetes_binary_health_indicators_BRFSS2015.csv",
+    "new_data": [
+      "/content/brfss2025_recoded.csv"
+    ],
+    "promote": false,
+    "ignore_schedule": true,
+    "force": false,
+    "skip_cv": true,
+    "skip_repro_check": false,
+    "now": null
+  },
+  "data": {
+    "historical": {
+      "file": "/content/repo/diabetes_app/data/diabetes_binary_health_indicators_BRFSS2015.csv",
+      "rows": 253680,
+      "sha256": "0f8ff13c40c0908fc6e9bf43dc05b3be706c6195481ac595b8e0adb256a79774"
+    },
+    "new": {
+      "files": [
+        {
+          "file": "/content/brfss2025_recoded.csv",
+          "format": "dataset",
+          "rows": 201093,
+          "sha256": "710e3b441fa6dcfc65afaec30e02ae8a40caf84a0770108f1539e61eed4bd919"
+        }
+      ],
+      "pending_unlabeled": 0,
+      "valid_labeled": 201093,
+      "rejected": 0,
+      "positives": 31049,
+      "negatives": 170044,
+      "already_used_by_production": 0,
+      "fresh_labeled": 201093,
+      "fresh_positives": 31049,
+      "fresh_negatives": 170044
+    },
+    "split": {
+      "historical_train": 202944,
+      "locked_test": 50736,
+      "new_train": 160934,
+      "new_holdout": 40159
+    }
+  },
+  "notes": [
+    "Historical CSV checksum differs from the reference copy; the locked-test check below decides whether it is still the same data."
+  ],
+  "policy": {
+    "days_since_last_training": 20.1
+  },
+  "policy_problems": [],
+  "reproduction_max_abs_diff": 0.0,
+  "evaluation": {
+    "production": {
+      "locked_test": {
+        "n": 50736,
+        "positives": 7069,
+        "prevalence": 0.13932907600126143,
+        "pr_auc": 0.4258073225423215,
+        "roc_auc": 0.8280485579168309,
+        "brier": 0.09868237609635583,
+        "naive_brier": 0.11991648458189613,
+        "brier_skill_score": 0.17707414088709894,
+        "capacity": [
+          {
+            "capacity": 0.005,
+            "capacity_pct": "0.5%",
+            "k": 254,
+            "precision_at_k": 0.6889763779527559,
+            "recall_at_k": 0.02475597680011317,
+            "lift_at_k": 4.94495763358481
+          },
+          {
+            "capacity": 0.01,
+            "capacity_pct": "1%",
+            "k": 508,
+            "precision_at_k": 0.6614173228346457,
+            "recall_at_k": 0.04753147545621729,
+            "lift_at_k": 4.747159328241418
+          },
+          {
+            "capacity": 0.025,
+            "capacity_pct": "2.5%",
+            "k": 1269,
+            "precision_at_k": 0.6052009456264775,
+            "recall_at_k": 0.1086433724713538,
+            "lift_at_k": 4.343680177861786
+          },
+          {
+            "capacity": 0.05,
+            "capacity_pct": "5%",
+            "k": 2537,
+            "precision_at_k": 0.5415845486795428,
+            "recall_at_k": 0.1943697835620314,
+            "lift_at_k": 3.8870892151372587
+          },
+          {
+            "capacity": 0.1,
+            "capacity_pct": "10%",
+            "k": 5074,
+            "precision_at_k": 0.4773354355538037,
+            "recall_at_k": 0.34262271891356627,
+            "lift_at_k": 3.42595708845067
+          },
+          {
+            "capacity": 0.2,
+            "capacity_pct": "20%",
+            "k": 10148,
+            "precision_at_k": 0.39662987780843517,
+            "recall_at_k": 0.569387466402603,
+            "lift_at_k": 2.846712898640369
+          }
+        ]
+      },
+      "new_holdout": {
+        "n": 40159,
+        "positives": 6161,
+        "prevalence": 0.15341517468064444,
+        "pr_auc": 0.4155154322016833,
+        "roc_auc": 0.8085403192463684,
+        "brier": 0.1084729996743606,
+        "naive_brier": 0.1298789588583518,
+        "brier_skill_score": 0.1648146810857708,
+        "capacity": [
+          {
+            "capacity": 0.005,
+            "capacity_pct": "0.5%",
+            "k": 201,
+            "precision_at_k": 0.6517412935323383,
+            "recall_at_k": 0.02126278201590651,
+            "lift_at_k": 4.248219218789997
+          },
+          {
+            "capacity": 0.01,
+            "capacity_pct": "1%",
+            "k": 402,
+            "precision_at_k": 0.6293532338308457,
+            "recall_at_k": 0.04106476221392631,
+            "lift_at_k": 4.1022880242514095
+          },
+          {
+            "capacity": 0.025,
+            "capacity_pct": "2.5%",
+            "k": 1004,
+            "precision_at_k": 0.5826693227091634,
+            "recall_at_k": 0.09495211816263593,
+            "lift_at_k": 3.7979901526825666
+          },
+          {
+            "capacity": 0.05,
+            "capacity_pct": "5%",
+            "k": 2008,
+            "precision_at_k": 0.5378486055776892,
+            "recall_at_k": 0.1752962181464048,
+            "lift_at_k": 3.5058370640146763
+          },
+          {
+            "capacity": 0.1,
+            "capacity_pct": "10%",
+            "k": 4016,
+            "precision_at_k": 0.4770916334661355,
+            "recall_at_k": 0.31098847589677,
+            "lift_at_k": 3.109807321598204
+          },
+          {
+            "capacity": 0.2,
+            "capacity_pct": "20%",
+            "k": 8032,
+            "precision_at_k": 0.4011454183266932,
+            "recall_at_k": 0.522967050803441,
+            "lift_at_k": 2.6147701435776125
+          }
+        ]
+      }
+    },
+    "candidate": {
+      "locked_test": {
+        "n": 50736,
+        "positives": 7069,
+        "prevalence": 0.13932907600126143,
+        "pr_auc": 0.4247177942061861,
+        "roc_auc": 0.8279738191945177,
+        "brier": 0.0992153622690369,
+        "naive_brier": 0.11991648458189613,
+        "brier_skill_score": 0.17262949614505696,
+        "capacity": [
+          {
+            "capacity": 0.005,
+            "capacity_pct": "0.5%",
+            "k": 254,
+            "precision_at_k": 0.6889763779527559,
+            "recall_at_k": 0.02475597680011317,
+            "lift_at_k": 4.94495763358481
+          },
+          {
+            "capacity": 0.01,
+            "capacity_pct": "1%",
+            "k": 508,
+            "precision_at_k": 0.6692913385826772,
+            "recall_at_k": 0.04809732635450559,
+            "lift_at_k": 4.803673129768102
+          },
+          {
+            "capacity": 0.025,
+            "capacity_pct": "2.5%",
+            "k": 1269,
+            "precision_at_k": 0.607565011820331,
+            "recall_at_k": 0.10906776064507002,
+            "lift_at_k": 4.360647678556559
+          },
+          {
+            "capacity": 0.05,
+            "capacity_pct": "5%",
+            "k": 2537,
+            "precision_at_k": 0.535672053606622,
+            "recall_at_k": 0.19224784269345027,
+            "lift_at_k": 3.844653743356284
+          },
+          {
+            "capacity": 0.1,
+            "capacity_pct": "10%",
+            "k": 5074,
+            "precision_at_k": 0.47516752069373275,
+            "recall_at_k": 0.34106662894327344,
+            "lift_at_k": 3.4103974154643124
+          },
+          {
+            "capacity": 0.2,
+            "capacity_pct": "20%",
+            "k": 10148,
+            "precision_at_k": 0.39722112731572723,
+            "recall_at_k": 0.5702362427500354,
+            "lift_at_k": 2.850956445818466
+          }
+        ]
+      },
+      "new_holdout": {
+        "n": 40159,
+        "positives": 6161,
+        "prevalence": 0.15341517468064444,
+        "pr_auc": 0.41974803488467294,
+        "roc_auc": 0.8112960906385941,
+        "brier": 0.10800735140488243,
+        "naive_brier": 0.1298789588583518,
+        "brier_skill_score": 0.16839992902409162,
+        "capacity": [
+          {
+            "capacity": 0.005,
+            "capacity_pct": "0.5%",
+            "k": 201,
+            "precision_at_k": 0.6766169154228856,
+            "recall_at_k": 0.022074338581399122,
+            "lift_at_k": 4.41036499049954
+          },
+          {
+            "capacity": 0.01,
+            "capacity_pct": "1%",
+            "k": 402,
+            "precision_at_k": 0.6318407960199005,
+            "recall_at_k": 0.041227073527024836,
+            "lift_at_k": 4.118502601422364
+          },
+          {
+            "capacity": 0.025,
+            "capacity_pct": "2.5%",
+            "k": 1004,
+            "precision_at_k": 0.5846613545816733,
+            "recall_at_k": 0.09527674078883298,
+            "lift_at_k": 3.8109747344011393
+          },
+          {
+            "capacity": 0.05,
+            "capacity_pct": "5%",
+            "k": 2008,
+            "precision_at_k": 0.5433266932270916,
+            "recall_at_k": 0.17708164259048856,
+            "lift_at_k": 3.5415446637407517
+          },
+          {
+            "capacity": 0.1,
+            "capacity_pct": "10%",
+            "k": 4016,
+            "precision_at_k": 0.48580677290836655,
+            "recall_at_k": 0.3166693718552183,
+            "lift_at_k": 3.16661486661696
+          },
+          {
+            "capacity": 0.2,
+            "capacity_pct": "20%",
+            "k": 8032,
+            "precision_at_k": 0.4057519920318725,
+            "recall_at_k": 0.5289725693880863,
+            "lift_at_k": 2.644796988801813
+          }
+        ]
+      }
+    },
+    "primary_set": "new_holdout",
+    "primary_pr_auc_diff_ci95": [
+      0.002580701808813324,
+      0.006283340235337684
+    ],
+    "candidate_oof": null
+  },
+  "checks": [
+    {
+      "check": "Primary PR-AUC (new_holdout): candidate − production ≥ 0.0",
+      "value": 0.004232602682989639,
+      "passed": true
+    },
+    {
+      "check": "Locked-test PR-AUC drop ≤ 0.005",
+      "value": 0.0010895283361354036,
+      "passed": true
+    },
+    {
+      "check": "Locked-test Brier increase ≤ 0.002",
+      "value": 0.000532986172681077,
+      "passed": true
+    },
+    {
+      "check": "Locked-test Precision@0.5% drop ≤ 0.02",
+      "value": 0.0,
+      "passed": true
+    },
+    {
+      "check": "Locked-test Precision@1% drop ≤ 0.02",
+      "value": -0.007874015748031482,
+      "passed": true
+    },
+    {
+      "check": "Locked-test Precision@2.5% drop ≤ 0.02",
+      "value": -0.0023640661938534313,
+      "passed": true
+    },
+    {
+      "check": "Locked-test Precision@5% drop ≤ 0.02",
+      "value": 0.005912495072920798,
+      "passed": true
+    },
+    {
+      "check": "Locked-test Precision@10% drop ≤ 0.02",
+      "value": 0.002167914860070952,
+      "passed": true
+    },
+    {
+      "check": "Locked-test Precision@20% drop ≤ 0.02",
+      "value": -0.0005912495072920576,
+      "passed": true
+    }
+  ],
+  "candidate_version": "1.1.0",
+  "candidate_bundle": "model_registry/candidates/v1.1.0_20261111T081944Z_b041e9"
+}
